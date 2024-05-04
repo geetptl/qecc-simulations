@@ -26,9 +26,11 @@ for i_p, p in enumerate(probs):
         if error_count_calculated == count_errors:
             plot_data[i_p] += 1
 
-plt.plot(probs, plot_data*100/N)
+plt.plot(probs, plot_data*100/N, label="With Error Correction")
+plt.plot(probs, np.linspace(100, 0, probs.shape[0]), linestyle='dashed', label="Without Error Correction")
 plt.ylabel("% times where correct errors detected")
 plt.xlabel("p")
 plt.grid()
+plt.legend()
 plt.title("Effectiveness of parity-bit error correction on 2-bit information")
 plt.savefig("plots/plot1.svg")
