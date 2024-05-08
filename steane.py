@@ -18,14 +18,17 @@ def steane_encode(logical_state):
     encoding_circuit.cx(0, 1)
     encoding_circuit.cx(0, 2)
     encoding_circuit.barrier()
+
     encoding_circuit.cx(6, 0)
     encoding_circuit.cx(6, 1)
     encoding_circuit.cx(6, 3)
     encoding_circuit.barrier()
+
     encoding_circuit.cx(5, 0)
     encoding_circuit.cx(5, 2)
     encoding_circuit.cx(5, 3)
     encoding_circuit.barrier()
+
     encoding_circuit.cx(4, 1)
     encoding_circuit.cx(4, 2)
     encoding_circuit.cx(4, 3)
@@ -36,18 +39,25 @@ def steane_encode(logical_state):
 
 def introduce_errors(encoded_state, p):
     error_circuit = encoded_state.copy()
-    errors = [0]
-    for e in errors:
-        error_circuit.x(e)
+
+    errors_X = [5]
+    for ex in errors_X:
+        error_circuit.x(ex)
+
+    errors_Z = [4]
+    for ez in errors_Z:
+        error_circuit.z(ez)
+
+    error_circuit.barrier()
+
     # error_circuit.x(0)
     # for i in range(7):
     #     p_flip = np.random.random(1)[0]
     #     if p_flip < p:
     #         errors.append(i)
     #         error_circuit.x(i)
-    error_circuit.barrier()
 
-    return errors, error_circuit
+    return errors_X, errors_Z, error_circuit
 
 
 def measure_stabilizers(noisy_state):
@@ -80,6 +90,7 @@ def measure_stabilizers(noisy_state):
     stabilizer_circuit.cx(6, bit[0])
     stabilizer_circuit.barrier()
 
+    stabilizer_circuit.h(phase)
     stabilizer_circuit.cx(phase[2], 0)
     stabilizer_circuit.cx(phase[2], 2)
     stabilizer_circuit.cx(phase[2], 4)
@@ -113,52 +124,51 @@ def correct_errors(noisy_state, stabilizer_circuit):
         stabilizer_circuit, Aer.get_backend("qasm_simulator"), shots=1
     ).result()
     counts = result.get_counts()
-    print(counts)
-    phase_ = list(counts.keys())[0].split()[0]
-    bit_ = list(counts.keys())[0].split()[1]
-    print(f"Phase {phase_}")
-    print(f"Bit {bit_}")
-    # error_key = list(counts.keys())[0][::-1]  # Reverse the key to match the qubit order
-
+    phase_ = list(counts.keys())[0].split()[0][::-1]
+    bit_ = list(counts.keys())[0].split()[1][::-1]
     corrected_circuit = noisy_state.copy()
 
-    # z_syndrome_to_error = {
-    #     "000": None,
-    #     "001": 2,
-    #     "010": 1,
-    #     "011": 5,
-    #     "100": 0,
-    #     "101": 4,
-    #     "110": 3,
-    #     "111": 6,
-    # }
+    z_syndrome_to_error = {
+        "000": None,
+        "001": 0,
+        "010": 1,
+        "011": 2,
+        "100": 3,
+        "101": 4,
+        "110": 5,
+        "111": 6,
+    }
 
-    # x_syndrome_to_error = {
-    #     "000": None,
-    #     "001": 5,
-    #     "010": 3,
-    #     "011": 6,
-    #     "100": 4,
-    #     "101": 0,
-    #     "110": 1,
-    #     "111": 2,
-    # }
+    x_syndrome_to_error = {
+        "000": None,
+        "001": 0,
+        "010": 1,
+        "011": 2,
+        "100": 3,
+        "101": 4,
+        "110": 5,
+        "111": 6,
+    }
 
-    # # Correction for X errors
-    # x_error_key = error_key[3:6]
-    # if x_error_key in x_syndrome_to_error:
-    #     error_pos = x_syndrome_to_error[x_error_key]
-    #     if error_pos is not None:
-    #         corrected_circuit.x(error_pos)
+    # Correction for X errors
+    x_error_key = bit_
+    error_X = []
+    if x_error_key in x_syndrome_to_error:
+        error_pos = x_syndrome_to_error[x_error_key]
+        if error_pos is not None:
+            error_X.append(error_pos)
+            corrected_circuit.x(error_pos)
 
-    # # Correction for Z errors
-    # z_error_key = error_key[0:3]
-    # if z_error_key in z_syndrome_to_error:
-    #     error_pos = z_syndrome_to_error[z_error_key]
-    #     if error_pos is not None:
-    #         corrected_circuit.z(error_pos)
+    # Correction for Z errors
+    z_error_key = phase_
+    error_Z = []
+    if z_error_key in z_syndrome_to_error:
+        error_pos = z_syndrome_to_error[z_error_key]
+        if error_pos is not None:
+            error_Z.append(error_pos)
+            corrected_circuit.z(error_pos)
 
-    return corrected_circuit
+    return error_X, error_Z, corrected_circuit
 
 
 def steane_decode(corrected_state):
@@ -170,40 +180,28 @@ def steane_decode(corrected_state):
 
 
 def main():
-    N = 1
-    probs = np.linspace(0, 1, 1, endpoint=False)
+    N = 10
+    probs = np.linspace(0, 1, 10, endpoint=False)
     plot_data = np.zeros(probs.shape)
 
     for i_p, p in enumerate(probs):
         success_count = 0
         for n in range(N):
             logical_state = initialize_logical_qubit()
+
             steane_encoded_state = steane_encode(logical_state)
             print(steane_encoded_state)
-            errors, noisy_state = introduce_errors(steane_encoded_state, p)
+
+            error_X, error_Z, noisy_state = introduce_errors(steane_encoded_state, p)
             stabilizer_circuit_before_correction = measure_stabilizers(noisy_state)
             print(stabilizer_circuit_before_correction)
-            corrected_state = correct_errors(
+
+            detected_error_X, detected_error_Z, corrected_state = correct_errors(
                 noisy_state, stabilizer_circuit_before_correction
             )
-            stabilizer_circuit_after_correction = measure_stabilizers(corrected_state)
-            result_before_correction = execute(
-                stabilizer_circuit_before_correction,
-                Aer.get_backend("qasm_simulator"),
-                shots=1,
-            ).result()
-            counts_before_correction = result_before_correction.get_counts()
-            error_key_before_correction = list(counts_before_correction.keys())[0]
+            print(corrected_state)
 
-            result_after_correction = execute(
-                stabilizer_circuit_after_correction,
-                Aer.get_backend("qasm_simulator"),
-                shots=1,
-            ).result()
-            counts_after_correction = result_after_correction.get_counts()
-            error_key_after_correction = list(counts_after_correction.keys())[0]
-
-            if error_key_before_correction == error_key_after_correction:
+            if error_X == detected_error_X and error_Z == detected_error_Z:
                 success_count += 1
 
         plot_data[i_p] = success_count
@@ -221,7 +219,7 @@ def main():
     plt.grid()
     plt.legend()
     plt.title("Effectiveness of Steane code error correction")
-    plt.savefig("steane_plot.png")
+    plt.savefig("plots/steane.svg")
 
 
 main()
