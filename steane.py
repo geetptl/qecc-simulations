@@ -40,22 +40,27 @@ def steane_encode(logical_state):
 def introduce_errors(encoded_state, p):
     error_circuit = encoded_state.copy()
 
-    errors_X = [5]
+    errors_X = [2]
+    errors_Z = [4]
+
     for ex in errors_X:
         error_circuit.x(ex)
 
-    errors_Z = [4]
     for ez in errors_Z:
         error_circuit.z(ez)
 
-    error_circuit.barrier()
-
-    # error_circuit.x(0)
     # for i in range(7):
     #     p_flip = np.random.random(1)[0]
     #     if p_flip < p:
-    #         errors.append(i)
-    #         error_circuit.x(i)
+    #         x_or_z = np.random.random(1)[0]
+    #         if x_or_z < 0.5:
+    #             errors_X.append(i)
+    #             error_circuit.x(i)
+    #         else:
+    #             errors_Z.append(i)
+    #             error_circuit.z(i)
+
+    error_circuit.barrier()
 
     return errors_X, errors_Z, error_circuit
 
@@ -180,8 +185,8 @@ def steane_decode(corrected_state):
 
 
 def main():
-    N = 10
-    probs = np.linspace(0, 1, 10, endpoint=False)
+    N = 1
+    probs = np.linspace(0, 1, 1, endpoint=False)
     plot_data = np.zeros(probs.shape)
 
     for i_p, p in enumerate(probs):
@@ -191,21 +196,36 @@ def main():
 
             steane_encoded_state = steane_encode(logical_state)
             print(steane_encoded_state)
+            fig = steane_encoded_state.draw(output="mpl")
+            fig.tight_layout()
+            fig.savefig('plots/steane_encoded_state.svg')
 
             error_X, error_Z, noisy_state = introduce_errors(steane_encoded_state, p)
+            print(noisy_state)
+            fig = noisy_state.draw(output="mpl")
+            fig.tight_layout()
+            fig.savefig('plots/noisy_state.svg')
+
             stabilizer_circuit_before_correction = measure_stabilizers(noisy_state)
             print(stabilizer_circuit_before_correction)
+            fig = stabilizer_circuit_before_correction.draw(output="mpl")
+            fig.tight_layout()
+            fig.savefig('plots/stabilizer_circuit_before_correction.svg')
 
             detected_error_X, detected_error_Z, corrected_state = correct_errors(
                 noisy_state, stabilizer_circuit_before_correction
             )
             print(corrected_state)
+            fig = corrected_state.draw(output="mpl")
+            fig.tight_layout()
+            fig.savefig('plots/corrected_state.svg')
 
             if error_X == detected_error_X and error_Z == detected_error_Z:
                 success_count += 1
 
         plot_data[i_p] = success_count
         print(f"Error probability: {p}, success rate: {success_count * 100 / N}%")
+        print(plot_data)
 
     plt.plot(probs, plot_data * 100 / N, label="With Error Correction")
     plt.plot(

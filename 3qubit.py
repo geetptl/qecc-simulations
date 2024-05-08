@@ -66,8 +66,8 @@ def correct_errors(stabilizer_circuit):
 
 # Main function
 def main():
-    N = 100
-    probs = np.linspace(0, 1, 10, endpoint=False)
+    N = 1000
+    probs = np.linspace(0, 1, 100, endpoint=False)
     plot_data = np.zeros(probs.shape)
 
     for i_p, p in enumerate(probs):
@@ -81,6 +81,7 @@ def main():
             # print(f"{identified_errors} == {errors} = {identified_errors == errors}")
             if identified_errors == errors:
                 plot_data[i_p] += 1
+        print(plot_data)
     
     plt.plot(probs, plot_data*100/N, label="With Error Correction")
     plt.plot(probs, np.linspace(100, 0, probs.shape[0]), linestyle='dashed', label="Without Error Correction")
@@ -89,7 +90,7 @@ def main():
     plt.grid()
     plt.legend()
     plt.title("Effectiveness of 3-qubit error correction code")
-    plt.savefig("plots/plot-3qubit.svg")
+    plt.savefig("plots/3qubit.svg")
 
 
 # Call the main function
